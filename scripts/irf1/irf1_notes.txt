@@ -1,0 +1,310 @@
+#!/bin/bash
+
+
+
+## Get IRF1 hits to validate
+grep IRF1 input_files/sig_assoc.fdr20.multi_or_cross_hits.txt | \
+	awk '{print $2}' \
+	> eqtls/genes.multi_or_cross.list
+
+echo gene_id var_id var_contig var_pos var_ref var_alt | \
+	tr ' ' '\t' > eqtls/gene_var.multi_or_cross.txt
+while read gene;
+do
+	zgrep $gene input_files/all_tiss.afcs.cov.overlap_vars.MAF05.txt.gz | \
+		awk '{print $4,$1,$1}' | tr '_' ' ' | \
+		awk '{OFS="\t"; print $1,$2"_"$3"_"$4"_"$5"_"$6,$7,$8,$9,$10}'
+done < eqtls/genes.multi_or_cross.list >> eqtls/gene_var.multi_or_cross.txt
+
+
+
+## Test which eqtl vars are het in HEK293
+while read line;
+do
+	chr=`echo $line | awk '{print $3}'`
+	pos=`echo $line | awk '{print $4}'`
+	gt_line=`tabix input_files/293_CG.liftoverhg38.sorted.cleaned.vcf.gz $chr":"$pos"-"$pos`
+
+	if [[ "`echo $gt_line`" ]]
+	then
+		gt=`echo $gt_line | awk '{print $10}'`
+		echo $line $gt | tr ' ' '\t'
+	else
+		echo $line "./." | tr ' ' '\t'
+	fi
+
+done < eqtls/gene_var.multi_or_cross.txt | \
+	tee eqtls/gene_var_gt.multi_or_cross.txt | \
+	grep "0/1" > eqtls/gene_var_gt.multi_or_cross.hets.txt
+
+
+
+## Test which coding vars are het in HEK293
+genes=eqtls/genes.multi_or_cross.list
+while read gene
+do
+	echo $gene
+	grep $gene input_files/gencode.v26.GRCh38.genes.gtf | \
+		grep exon > coding_snps/exons/$gene.exons.txt
+done < $genes
+
+out_vars=coding_snps/gene_exon_var_gt.multi_or_cross.txt
+out_vars_het=coding_snps/gene_exon_var_gt.multi_or_cross.hets.txt
+echo gene exon variant chr pos ref alt gt | tr ' ' '\t' | \
+	tee $out_vars > $out_vars_het
+for file in coding_snps/exons/*exons.txt
+do
+	gene=`basename $file | awk -F. '{print $1"."$2}'`
+
+	while read line
+	do
+		chr=`echo $line | awk '{print $1}'`
+		pos1=`echo $line | awk '{print $4}'`
+		pos2=`echo $line | awk '{print $5}'`
+		exon=`echo $line | tr ';' '\n' | grep exon_number | awk '{print $2}' | sed 's/"//'`
+		gt_line=`tabix input_files/293_CG.liftoverhg38.sorted.cleaned.vcf.gz $chr":"$pos1"-"$pos2`
+
+        if [[ "`echo $gt_line`" ]]
+        then
+		var_id=`echo $gt_line | awk '{print $1"_"$2"_"$4"_"$5"_b38"}'`
+                gt=`echo $gt_line | awk '{print $10}'`
+                echo $gene $exon $var_id `echo $var_id | tr '_' ' ' | sed 's/b38//'`$gt | \
+			 tr ' ' '\t'
+        fi
+
+	done < $file 
+done | tee -a $out_vars | grep "0/1" >> $out_vars_het
+
+cat $out_vars_het | awk '{print $4,$5}' > coding_snps/coding_het_pos.multi_or_cross.txt
+
+## Get pileup info from bams
+module load samtools
+
+for bami in input_files/bams/SAM_Processing/finished/IRF1*bam
+do
+	ls $bami
+	infoi=`echo $bami | awk -F'[_-]' '{OFS="_"; print $5,$6,$7}'`
+	coding_snps=coding_snps/mpileup_$infoi\_hetcodingsnps.txt
+	samtools mpileup \
+		-f input_files/Homo_sapiens_assembly38_noALT_noHLA_noDecoy.fasta \
+		-l coding_snps/coding_het_pos.multi_or_cross.txt \
+		$bami \
+		> $coding_snps
+
+	ls $coding_snps
+	while read line
+	do
+                #echo NEW SET
+                #echo "$line"
+                ref=`echo "$line" | awk '{print $3}'`
+                chr_pos=`echo "$line" | awk '{print $1"_"$2"_"}'`
+                coding_line=`grep $chr_pos coding_snps/gene_exon_var_gt.multi_or_cross.hets.txt`
+                alt=`echo $coding_line | awk '{print $7}'`
+
+                #echo "$line"
+                all_reads=`echo "$line" | awk '{print $5 $8 $11 $14}' | sed 's/[*<>]//g'`
+                #echo $all_reads
+                #echo $all_reads | sed 's/[^.,]//g'
+                #echo $all_reads | sed "s/[^$alt${alt,}]//g"
+                #echo $all_reads | sed "s/[.,$alt${alt,}]//g"
+                num_ref=`echo $all_reads | sed 's/[^.,]//g' | wc -c`
+                num_alt=`echo $all_reads | sed "s/[^$alt${alt,}]//g" | wc -c`
+                num_other=`echo $all_reads | sed "s/[.,$alt${alt,}]//g" | wc -c`
+
+                #echo `echo "$line" | awk '{print $1,$2,$3}'` $alt $num_ref $num_alt $num_other
+                echo `echo "$line" | awk '{print $1,$2,$3}'` $alt $num_ref $num_alt $num_other $all_reads | \
+                        awk '{OFS="\t"; print $1,$2,$3,$4,$5-1,$6-1,$7-1,$8}'
+
+
+	done < $coding_snps > $coding_snps.sum
+done
+
+
+
+for timei in 0h 90m 12h
+do
+	for datai in C P E
+	do
+		bams=input_files/bams/SAM_Processing/finished/IRF1*$timei-$datai*bam
+		ls $bams
+		samtools mpileup \
+			-f input_files/Homo_sapiens_assembly38_noALT_noHLA_noDecoy.fasta \
+			-l coding_snps/coding_het_pos.multi_or_cross.txt \
+			$bams \
+			> coding_snps/mpileup_$datai\_$timei\_hetcodingsnps.txt
+	done
+done
+
+for dataset in coding_snps/mpileup*[mh]_hetcodingsnps.txt
+do
+	echo $dataset
+	while read line
+	do
+		#echo NEW SET
+		#echo "$line"
+		ref=`echo "$line" | awk '{print $3}'`
+		chr_pos=`echo "$line" | awk '{print $1"_"$2"_"}'`
+		coding_line=`grep $chr_pos coding_snps/gene_exon_var_gt.multi_or_cross.hets.txt`
+		alt=`echo $coding_line | awk '{print $7}'`
+
+		#echo "$line"
+		all_reads=`echo "$line" | awk '{print $5 $8 $11 $14}' | sed 's/[*<>]//g'`
+		#echo $all_reads
+		#echo $all_reads | sed 's/[^.,]//g'
+		#echo $all_reads | sed "s/[^$alt${alt,}]//g"
+		#echo $all_reads | sed "s/[.,$alt${alt,}]//g"
+		num_ref=`echo $all_reads | sed 's/[^.,]//g' | wc -c`
+		num_alt=`echo $all_reads | sed "s/[^$alt${alt,}]//g" | wc -c`
+		num_other=`echo $all_reads | sed "s/[.,$alt${alt,}]//g" | wc -c`
+
+		#echo `echo "$line" | awk '{print $1,$2,$3}'` $alt $num_ref $num_alt $num_other
+		echo `echo "$line" | awk '{print $1,$2,$3}'` $alt $num_ref $num_alt $num_other $all_reads | \
+			awk '{OFS="\t"; print $1,$2,$3,$4,$5-1,$6-1,$7-1,$8}'
+
+	done < $dataset > $dataset.sum
+done
+
+
+
+## Get IRF1 expr levels
+head -n 1 input_files/bams/Quantify_Summarize/margot_2019_10_01.counts.summary | \
+	tr '\t' '\n' | grep bam | awk -F'/' '{print $12}' > files1
+grep ENSG00000125347 input_files/bams/Quantify_Summarize/margot_2019_10_01.counts | \
+	awk '{for (i=7;i<=NF;i++) print $i}' > irf1
+grep ^Assigned input_files/bams/Quantify_Summarize/margot_2019_10_01.counts.summary | \
+	 tr '\t' '\n' | grep -v Assigned > tot1
+
+paste files1 tot1 | paste - irf1 | awk '{OFS="\t"; print $1,$2,$3,$3/$2*1000000}' \
+	> IRF1_norm_rc.txt
+
+
+
+
+## Get coding SNPs for all genes
+awk '{if ($3 == "gene") {print $10}}' input_files/gencode.v26.GRCh38.genes.gtf | \
+	sed 's/[";]//g' \
+	> input_files/gencode.v26.GRCh38.genes.list
+genes=input_files/gencode.v26.GRCh38.genes.list
+while read gene
+do
+        echo $gene
+        grep $gene input_files/gencode.v26.GRCh38.genes.gtf | \
+                grep exon > coding_snps/exons/$gene.exons.txt
+done < $genes
+
+out_vars=coding_snps/all_gene_exon_var_gt.txt
+out_vars_het=coding_snps/all_gene_exon_var_gt.hets.txt
+echo gene exon variant chr pos ref alt gt | tr ' ' '\t' | \
+        tee $out_vars > $out_vars_het
+for file in coding_snps/exons/*exons.txt
+do
+        gene=`basename $file | awk -F. '{print $1"."$2}'`
+
+        while read line
+        do
+                chr=`echo $line | awk '{print $1}'`
+                pos1=`echo $line | awk '{print $4}'`
+                pos2=`echo $line | awk '{print $5}'`
+                exon=`echo $line | tr ';' '\n' | grep exon_number | awk '{print $2}' | sed 's/"//'`
+                gt_line=`tabix input_files/293_CG.liftoverhg38.sorted.cleaned.vcf.gz $chr":"$pos1"-"$pos2`
+
+        if [[ "`echo $gt_line`" ]]
+        then
+                var_id=`echo $gt_line | awk '{print $1"_"$2"_"$4"_"$5"_b38"}'`
+                gt=`echo $gt_line | awk '{print $10}'`
+                echo $gene $exon $var_id `echo $var_id | tr '_' ' ' | sed 's/b38//'`$gt | \
+                         tr ' ' '\t'
+        fi
+
+        done < $file
+done | tee -a $out_vars | grep "0/1" >> $out_vars_het
+
+cat $out_vars_het | awk '{print $4,$5}' > coding_snps/all_coding_het_pos.txt
+
+
+
+## Get pileup info from bams
+module load samtools
+
+for bami in input_files/bams/SAM_Processing/finished/IRF1*bam
+do
+	ls $bami
+	infoi=`echo $bami | awk -F'[_-]' '{OFS="_"; print $5,$6,$7}'`
+	coding_snps=coding_snps/mpileup_$infoi\_allhetcodingsnps.txt
+	samtools mpileup \
+		-f input_files/Homo_sapiens_assembly38_noALT_noHLA_noDecoy.fasta \
+		-l coding_snps/all_coding_het_pos.noX.txt \
+		$bami \
+		> $coding_snps
+
+	ls $coding_snps
+	while read line
+	do
+                #echo NEW SET
+                #echo "$line"
+                ref=`echo "$line" | awk '{print $3}'`
+                chr_pos=`echo "$line" | awk '{print $1"_"$2"_"}'`
+                coding_line=`grep $chr_pos coding_snps/all_gene_exon_var_gt.hets.txt`
+                alt=`echo $coding_line | awk '{print $7}'`
+
+                #echo "$line"
+                all_reads=`echo "$line" | awk '{print $5 $8 $11 $14}' | sed 's/[*<>]//g'`
+                #echo $all_reads
+                #echo $all_reads | sed 's/[^.,]//g'
+                #echo $all_reads | sed "s/[^$alt${alt,}]//g"
+                #echo $all_reads | sed "s/[.,$alt${alt,}]//g"
+                num_ref=`echo $all_reads | sed 's/[^.,]//g' | wc -c`
+                num_alt=`echo $all_reads | sed "s/[^$alt${alt,}]//g" | wc -c`
+                num_other=`echo $all_reads | sed "s/[.,$alt${alt,}]//g" | wc -c`
+
+                #echo `echo "$line" | awk '{print $1,$2,$3}'` $alt $num_ref $num_alt $num_other
+                echo `echo "$line" | awk '{print $1,$2,$3}'` $alt $num_ref $num_alt $num_other $all_reads | \
+                        awk '{OFS="\t"; print $1,$2,$3,$4,$5-1,$6-1,$7-1,$8}'
+
+
+	done < $coding_snps > $coding_snps.sum
+done
+
+
+
+
+## Get IRF (all) hits to validate
+grep IRF input_files/sig_assoc.fdr20.multi_or_cross_hits.txt | \
+	awk '{print $2}' \
+	> eqtls/genes.multi_or_cross.IRF_all.list
+
+echo gene_id var_id var_contig var_pos var_ref var_alt | \
+	tr ' ' '\t' > eqtls/gene_var.multi_or_cross.IRF_all.txt
+while read gene;
+do
+	zgrep $gene input_files/all_tiss.afcs.cov.overlap_vars.MAF05.txt.gz | \
+		awk '{print $4,$1,$1}' | tr '_' ' ' | \
+		awk '{OFS="\t"; print $1,$2"_"$3"_"$4"_"$5"_"$6,$7,$8,$9,$10}'
+done < eqtls/genes.multi_or_cross.IRF_all.list >> eqtls/gene_var.multi_or_cross.IRF_all.txt
+
+
+
+## Test which eqtl vars are het in HEK293
+while read line;
+do
+	chr=`echo $line | awk '{print $3}'`
+	pos=`echo $line | awk '{print $4}'`
+	gt_line=`tabix input_files/293_CG.liftoverhg38.sorted.cleaned.vcf.gz $chr":"$pos"-"$pos`
+
+	if [[ "`echo $gt_line`" ]]
+	then
+		gt=`echo $gt_line | awk '{print $10}'`
+		echo $line $gt | tr ' ' '\t'
+	else
+		echo $line "./." | tr ' ' '\t'
+	fi
+
+done < eqtls/gene_var.multi_or_cross.IRF_all.txt | \
+	tee eqtls/gene_var_gt.multi_or_cross.IRF_all.txt | \
+	grep "0/1" > eqtls/gene_var_gt.multi_or_cross.IRF_all.hets.txt
+
+
+
+
+
+

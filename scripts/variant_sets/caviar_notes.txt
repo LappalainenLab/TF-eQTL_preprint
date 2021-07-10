@@ -1,0 +1,48 @@
+#!/bin/bash
+
+
+## Combine confidence sets per tissue
+for tiss in `ls caviar_output_GTEx_LD/ | sed 's/.allpairs.txt//'`
+do
+
+	job_name=cav_com_$tiss
+	sbatch --job-name=$job_name --out=log/$job_name.%j.out \
+		--partition=pe2 \
+		--mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+		--wrap "grep [0-9] caviar_output_GTEx_LD/$tiss.*/chr*/set/* | \
+		tr ':' '/' | \
+		awk -F'/' '{OFS=\"\t\"; print \$2, \$5, \$3, \$6}' | \
+		sed 's/.allpairs.txt//' | sed 's/_new.out_set//' > \
+			caviar_output_GTEx_LD_combined/$tiss.alleqtls.95set.txt"
+done
+
+
+## Combine tissues for one final variant list (no repeats)
+cat caviar_output_GTEx_LD_combined/*alleqtls.95set.txt | \
+	cut -f 2-4 | \
+	sort -k1,1 -k3,3n | \
+	uniq | \
+	tee caviar_output_GTEx_LD_combined/all_tiss.uniqueeqtls.95set.txt | \
+	cut -f 2-3 | \
+	sort -k1,1 -k2,2n | \
+	uniq | \
+	awk '{OFS="\t"; print $1,$2-1,$2}' > \
+	caviar_output_GTEx_LD_combined/all_tiss.all_snps.95set.bed
+
+
+## Get 5% maf variants
+maf=05
+job_name=getCavMAF$maf
+sbatch --job-name=$job_name --output=`pwd`/log/$job_name.%j.out \
+        --partition=pe2 --time=100:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+	--array=1-419 \
+        scripts/getCaviarMAF.sh $maf
+out_vcf=caviar_output_maf/caviar_var.95set.all_tiss.MAF05.vcf
+tabix -H caviar_output_maf/GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze_MAF05.noX.vcf.gz \
+	> $out_vcf
+cat caviar_output_maf/split/*MAF05* | sort -k1,1 -k2,2n | uniq >> $out_vcf
+bgzip $out_vcf
+tabix $out_vcf.gz
+
+

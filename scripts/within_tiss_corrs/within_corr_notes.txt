@@ -1,0 +1,66 @@
+#!/bin/bash
+
+
+
+## 1. Select variants of interest from plink file
+module load plink/1.90-b3.29
+plink --bfile genotypes/GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze.SHAPEIT2_phased.MAF01 \
+	--extract variant_sets/overlap_vars.MAF05.list \
+	--make-bed \
+	--output-chr chrM \
+	--out genotypes/GTEx_v8.overlap_vars.MAF05 \
+	&> log/selectVars_plink.log
+
+## 2. Run tensorqtl!
+
+for tiss in `awk '{if (NR>1) {print $1} }' input_files/representative_tissues.20.txt`;
+do
+	echo $tiss
+	mkdir tensorqtl/$tiss
+	job_name=tens_$tiss
+	num=`wc -l input_files/TFs.info.curated.txt | awk '{print $1"-1"}' | bc`
+	sbatch --job-name=$job_name --array 1-$num \
+        	--output=log/tensorqtl_TFnormi_$tiss_%A_%a.out \
+        	scripts/runTensorQTLTFInteraction_tiss.slurm $tiss
+
+done
+
+## 3. Combine significant hits
+for tf in `awk '{ if (NR > 1) {print $1} }' input_files/TFs.info.curated.txt`
+do
+	scripts/combineSigHits_bytf.sh $tf 2>&1 | \
+		tee log/combineSigHits_$tf.log
+done
+
+out_file=tensorqtl/sig_assoc.fdr05.partial.txt
+head -n 1 tensorqtl/partial_tf_files/AHR.norm.ieqtl.sig_assoc.fdr05.partial.txt > $out_file
+for file in tensorqtl/partial_tf_files/*fdr05*txt
+do
+	tail -n +2 $file >> $out_file
+done
+
+
+out_file=tensorqtl/sig_assoc.fdr20.partial.txt
+head -n 1 tensorqtl/partial_tf_files/AHR.norm.ieqtl.sig_assoc.fdr20.partial.txt > $out_file
+for file in tensorqtl/partial_tf_files/*fdr20*txt
+do
+	tail -n +2 $file >> $out_file
+done
+
+
+for tiss in `awk '{ if (NR > 1) {print $1} }' input_files/tissue_info.txt`
+do
+	scripts/combineSigHits_bytiss.sh $tiss 2>&1 | \
+		tee log/combineSigHits_$tiss.log
+done
+
+
+echo tf gene var pval_adj_bh_tf tiss | tr ' ' '\t' > tensorqtl/all_tiss.norm.ieqtl.sig_assoc.fdr20.txt
+while read line
+do
+        tiss=`echo $line | awk '{print $1}'`
+        tiss_file=tensorqtl/$tiss.norm.ieqtl.sig_assoc.fdr20.txt
+        awk '{ if (NR > 1) {OFS="\t"; print $19,$1,$2,$18,$20} }' $tiss_file
+done < input_files/tissue_info.final.txt >> tensorqtl/all_tiss.norm.ieqtl.sig_assoc.fdr20.txt
+
+

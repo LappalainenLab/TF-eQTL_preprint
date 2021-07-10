@@ -1,0 +1,45 @@
+#!/bin/bash
+
+cd ~/data/gtex/v8/motif_overlap/
+
+## 1. Calculate motif overlap for each TF
+num=`wc -l input_files/HOCOMOCOv11_core_annotation_HUMAN_mono.tsv | awk '{print $1"-1"}' | bc`
+job_name=submitMotifOverlapHocomoByTF
+sbatch --job-name=$job_name --output=`pwd`/log/$job_name.%A.%a.out \
+	--partition=pe2 --array=1-$num \
+	--mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+	scripts/submitSequenceMotifOverlapByChr.sh
+
+
+## 2. Combine chrs
+num=`wc -l input_files/HOCOMOCOv11_core_annotation_HUMAN_mono.tsv | awk '{print $1"-1"}' | bc`
+job_name=combineMotifOverlapHocomocoChrs
+sbatch --job-name=$job_name --output=`pwd`/log/$job_name.%A.%a.out \
+	--partition=pe2 --array=1-$num \
+	--mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+	scripts/combineSequenceMotifOverlapChrs.sh
+
+
+## 3. Combine TFs
+qsub -j y -o `pwd`/log/ -N combineMotifOverlapTFs \
+	-M eflynn@nygenome.org -m beas \
+	scripts/combineSequenceMotifOverlapsTFs.sh
+either_file=HOCOMOCO_TF_motif_overlap.either.GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze_MAF01_GTonly.txt.gz
+zcat $either_file | head -n 1 > `echo $either_file | sed 's/txt.gz/header/'`
+
+
+## 4. Select curated list of TFs (also with ChIPseq data) and variants (MAF > 5%)
+job_name=getCuratedOverlaps_either_05
+sbatch --job-name=$job_name --output=`pwd`/log/$job_name.%A.%a.out \
+	--partition=pe2 --time=100:00:00 \
+	--mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+	--array=1-22 \
+	scripts/getCuratedOverlaps.sh overlaps/HOCOMOCO_TF_motif_overlap.either.GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze_MAF01_GTonly.txt.gz 05
+job_name=combineCuratedOverlaps_either_05
+sbatch --job-name=$job_name --output=`pwd`/log/$job_name.%J.out \
+	--partition=pe2 --time=100:00:00 \
+	--mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+	scripts/combineCuratedOverlaps.sh overlaps/HOCOMOCO_TF_motif_overlap.either.GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze_MAF01_GTonly.txt.gz 05
+scripts/getOverlapsOnly.sh either 05
+
+

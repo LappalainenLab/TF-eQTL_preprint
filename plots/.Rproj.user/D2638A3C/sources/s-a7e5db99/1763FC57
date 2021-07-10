@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1625893167763.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "1763FC57",
+    "lastKnownWriteTime" : 1625040134,
+    "last_content_update" : 1625040134,
+    "path" : "/gpfs/commons/groups/lappalainen_lab/eflynn/projects/MANUSCRIPT/plots/fig3_asb.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "57,44",
+        "scrollLine" : "8",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

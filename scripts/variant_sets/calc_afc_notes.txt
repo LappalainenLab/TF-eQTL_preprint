@@ -1,0 +1,73 @@
+#!/bin/bash
+##
+##	See input_files/ for data provenance.
+##
+##	The data on eQTLs of interest are extracted to expr folder or snp file.
+##
+##	Then aFC.py is run.
+##
+##		EDF 7/11/19
+##
+
+
+
+## 1. Get eGene expr
+num_tiss=`awk -F'\t' '{print $2}' ../input_files/tissue_translation_colors_v8.txt | tail -n +2 | wc -l`
+
+in_var_file=caviar_var.95set.eqtls.MAF05.overlap
+job_name=submitGetExpr_05
+sbatch --job-name=$job_name --array 1-$num_tiss \
+	--output=log/$job_name.%A.%a.out \
+	--partition=pe2 --time=100:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+	scripts/submitGetExpr.sh $in_var_file
+job_name=combineExpr_05
+sbatch --job-name=$job_name --array 1-$num_tiss \
+	--output=log/$job_name.%A.%a.out \
+	--partition=pe2 --time=100:00:00 \
+	--mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+	scripts/combineExpr.sh $in_var_file
+
+
+
+## 2. Get GTs
+in_vars=overlap_vars.MAF05
+job_name=getGTs_05
+sbatch --job-name=$job_name --array 1-22 \
+        --output=log/$job_name.%A.%a.out \
+        --partition=pe2 --time=100:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+        scripts/getGTs.sh $in_vars
+
+
+
+## 3. Calculate effect size (run aFC.py)
+num_tiss=`awk -F'\t' '{print $2}' ../input_files/tissue_translation_colors_v8.txt | tail -n +2 | wc -l`
+
+maf=05
+job_name=calcaFC_05
+sbatch --job-name=$job_name --array 1-$num_tiss \
+        --output=log/$job_name.%A.%a.out \
+        --partition=pe2 --time=100:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+        scripts/submitCalcaFC.sh $maf
+job_name=combineaFC_05
+sbatch --job-name=$job_name --array 1-22 \
+        --output=log/$job_name.%A.%a.out \
+        --partition=pe2 --time=100:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+        scripts/combineaFCs_wrapper.sh $maf
+job_name=combineaFC_05_cov_last
+sbatch --job-name=$job_name \
+        --output=log/$job_name.%j.out \
+        --partition=pe2 --time=100:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+        scripts/combineaFCs_final.sh $maf cov
+job_name=combineaFC_05_nocov_last
+sbatch --job-name=$job_name \
+        --output=log/$job_name.%j.out \
+        --partition=pe2 --time=100:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+        scripts/combineaFCs_final.sh $maf nocov
+
+

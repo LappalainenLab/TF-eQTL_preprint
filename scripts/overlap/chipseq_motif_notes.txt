@@ -1,0 +1,236 @@
+#!/bin/bash
+
+## Get tiss overlap pi1 data 
+sbatchopts getPi1_fdr20 48 \
+	--array 1-22 \
+	--mem 6g \
+	scripts/getPi1TissOverlap_fdr20_bytiss_wrapper.sh 
+
+
+
+########## OVERLAP STATS ###########
+
+## Permute overlaps and calculate stats
+sbatchopts permGenesTFs 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr20.any_tiss_hits.txt
+
+sbatchopts permGenesTFs 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr20.multi_tiss_hits.txt
+sbatchopts permGenesTFs 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr20.tiss_cross_hits.txt
+sbatchopts permGenesTFs 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr05.cross_hits.txt
+sbatchopts permGenesTFs 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr20.multi_cross_hits.txt
+sbatchopts permGenesTFs 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr20.multi_or_cross_hits.txt
+
+for file in replication/indiv_tiss/*fdr20.txt
+do
+	tiss=`basename $file | awk -F'.' '{print $1}'`
+	sbatchopts permGenesTFs_$tiss 48 \
+        	--array 1-169 \
+        	--mem 10g \
+        	scripts/permGenesTFs_bytf_wrapper.sh $file
+done
+
+
+sbatchopts permGenesTFs_prot20 48 \
+        --array 1-169 \
+        --mem 10g \
+        scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr20.protein_hits.txt
+
+sbatchopts permGenesTFs_prot05 48 \
+        --array 1-169 \
+        --mem 10g \
+        scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr05.protein_hits.txt
+
+sbatchopts permGenesTFs 48 \
+        --array 1-169 \
+        --mem 10g \
+        scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr20.tiss_prot_hits.txt
+
+sbatchopts permGenesTFs 48 \
+        --array 1-169 \
+        --mem 10g \
+        scripts/permGenesTFs_bytf_wrapper.sh replication/sig_assoc.fdr20.multi_or_cross_or_prot_hits.txt
+
+
+
+## Get z scores and plots
+
+for g_file in `ls replication/sig_assoc.fdr*txt`
+do
+	echo $g_file
+	g_file2=`basename $g_file`
+	sbatchopts plotPerms 2 \
+		--mem 10g \
+		--wrap="module load R/3.6.0; Rscript scripts/analyzeOverlapPerm.R $g_file2"
+done
+
+for g_file in replication/indiv_tiss/*fdr20.txt
+do
+	echo $g_file
+        tiss=`basename $g_file | awk -F'.' '{print $1}'`
+	sbatchopts plotPerms 2 \
+		--mem 10g \
+		--wrap="module load R/3.6.0; Rscript scripts/analyzeOverlapPerm_tiss.R $tiss"
+done
+
+
+## Redo without uncorr stats
+for g_file in `ls replication/sig_assoc.fdr*txt`
+do
+        echo $g_file
+        g_file2=`basename $g_file`
+        sbatchopts calcOverlap 2 \
+                --mem 10g \
+                --wrap="module load R/3.6.0; Rscript scripts/calcOverlap_nouncorr.R $g_file2"
+done
+
+for g_file in replication/indiv_tiss/*fdr20.txt
+do
+        echo $g_file
+        g_file2=`basename $g_file`
+        sbatchopts calcOverlap 2 \
+                --mem 10g \
+                --wrap="module load R/3.6.0; Rscript scripts/calcOverlap_nouncorr.R $g_file2"
+done
+
+
+### REDO because number of sig genes in perms were off??
+sbatchopts permGenesTFs2 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper2.sh replication/sig_assoc.fdr20.multi_tiss_hits.txt
+sbatchopts permGenesTFs2 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper2.sh replication/sig_assoc.fdr20.tiss_cross_hits.txt
+
+
+sbatchopts permGenesTFs2 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper2.sh replication/sig_assoc.fdr20.multi_or_cross_hits.txt
+sbatchopts permGenesTFs2 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper2.sh replication/sig_assoc.fdr20.any_tiss_hits.txt
+sbatchopts permGenesTFs2 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper2.sh replication/sig_assoc.fdr20.protein_hits_filtered.txt
+sbatchopts permGenesTFs2 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper2.sh replication/sig_assoc.fdr20.protein_hits.txt
+sbatchopts permGenesTFs2 48 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/permGenesTFs_bytf_wrapper2.sh replication/sig_assoc.fdr05.cross_hits.txt
+
+
+
+
+for g_file in `ls replication/sig_assoc.fdr*txt`
+do
+	echo $g_file
+	g_file2=`basename $g_file`
+	sbatchopts plotPerms 2 \
+		--mem 10g \
+		--wrap="module load R/3.6.0; Rscript scripts/analyzeOverlapPerm3.R $g_file2"
+done
+
+
+for g_file in `ls replication/sig_assoc.fdr*txt`
+do
+        echo $g_file
+        g_file2=`basename $g_file`
+        sbatchopts calcOverlap 2 \
+                --mem 10g \
+                --wrap="module load R/3.6.0; Rscript scripts/calcOverlap3.R $g_file2"
+done
+
+summarizeOverlap3.R
+
+
+sbatchopts analyzeOverlap 3 \
+	--mem 10g \
+	--wrap="module load R/3.6.0; Rscript scripts/analyzeOverlapPerm3.R sig_assoc.fdr20.multi_or_cross_hits.txt"
+
+
+### Try comparing tf to other tfs
+sbatchopts compGenesTFs3 12 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/compareGenesTFs_bytf3_wrapper.sh replication/sig_assoc.fdr20.multi_tiss_hits.txt
+sbatchopts compGenesTFs3 12 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/compareGenesTFs_bytf3_wrapper.sh replication/sig_assoc.fdr20.tiss_cross_hits.txt
+sbatchopts compGenesTFs3 12 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/compareGenesTFs_bytf3_wrapper.sh replication/sig_assoc.fdr20.multi_or_cross_hits.txt
+sbatchopts compGenesTFs3 12 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/compareGenesTFs_bytf3_wrapper.sh replication/sig_assoc.fdr20.any_tiss_hits.txt
+sbatchopts compGenesTFs3 12 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/compareGenesTFs_bytf3_wrapper.sh replication/sig_assoc.fdr20.protein_hits_filtered.txt
+sbatchopts compGenesTFs3 12 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/compareGenesTFs_bytf3_wrapper.sh replication/sig_assoc.fdr20.protein_hits.txt
+sbatchopts compGenesTFs3 12 \
+	--array 1-169 \
+	--mem 10g \
+	scripts/compareGenesTFs_bytf3_wrapper.sh replication/sig_assoc.fdr05.cross_hits.txt
+
+
+
+#for g_file in `ls replication/sig_assoc.fdr*txt`
+#do
+#	echo $g_file
+#	g_file2=`basename $g_file`
+#	sbatchopts plotPerms 2 \
+#		--mem 10g \
+#		--wrap="module load R/3.6.0; Rscript scripts/analyzeOverlapPerm3_comp.R $g_file2"
+#done
+
+
+for g_file in `ls replication/sig_assoc.fdr*txt`
+do
+        echo $g_file
+        g_file2=`basename $g_file`
+        sbatchopts calcOverlap 2 \
+                --mem 10g \
+                --wrap="module load R/3.6.0; Rscript scripts/calcOverlap3_comp.R $g_file2"
+done
+
+for var_file in `ls replication/*var*txt`;
+do
+	echo $var_file
+	sbatchopts topVarOverlap 4 \
+		--mem 10g \
+		--wrap="module load R/3.6.0; Rscript scripts/getOverlapEnrich_topvar.R $var_file"
+done
+
+
+
+

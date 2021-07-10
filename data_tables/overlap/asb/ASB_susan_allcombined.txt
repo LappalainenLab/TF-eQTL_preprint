@@ -1,0 +1,2 @@
+tf	real_stat	exp_ASB_corr	num_gte	p_perm_tf
+all	0.0893335821323188	104.895949860284	8	0.0018

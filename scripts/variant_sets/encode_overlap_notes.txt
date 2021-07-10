@@ -1,0 +1,46 @@
+#!/bin/bash
+
+
+## 1. Intersect TF ChIPseq beds w/ GTEx VCF
+vcf=genetic_data/GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze_MAF001_GTonly.vcf.gz
+while read line
+do
+	file=tf_chipseq_20200110/`echo $line | awk '{print $1}'`
+	cell=`echo $line | awk '{print $2}'`
+	tf=`echo $line | awk '{print $3}'`
+	
+	qsub -j y -o `pwd`/log/ -N $tf\_$cell\_intersect scripts/intersectChIPseqBedVcf.sh $vcf $file $tf $cell
+
+done < tf_chipseq_20200110/info_files/final_chipseqs.list
+
+
+## 2. Combine intersection files across TFs
+ls peak_intersect_vcfs/ | grep vcf.gz | \
+	awk -F. '{OFS="\t"; print $0,$2,$1}' > peak_intersect_vcfs/vcf_files.list
+in_vcf=genetic_data/GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze_MAF001_GTonly.vcf.gz
+in_file_list=peak_intersect_vcfs/vcf_files.list
+out_file=ENCODE_TF_overlap.GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze_MAF01_GTonly.txt
+qsub -e `pwd`/log/ -l h_vmem=100G -M eflynn@nygenome.org -m beas \
+	-cwd -o $out_file \
+	scripts/AnnotFeatureVcf2Tab_Peaks_updated.pl $in_vcf $in_file_list
+bgzip $out_file
+tabix -s 1 -b 2 -e 2 $out_file.gz
+
+
+
+
+## 3. Get curated TFs (motif info also) and variants (5% maf cutoff)
+job_name=getCuratedOverlaps_chip_05
+sbatch --job-name=$job_name --output=`pwd`/log/$job_name.%A.%a.out \
+	--partition=pe2 --time=100:00:00 \
+	--mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+	--array=1-22 \
+	scripts/getCuratedOverlaps.sh 05
+job_name=combineCuratedOverlaps_chip_05
+sbatch --job-name=$job_name --output=`pwd`/log/$job_name.%j.out \
+	--partition=pe2 --time=100:00:00 \
+	--mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+	scripts/combineCuratedOverlaps.sh 05
+scripts/getOverlapsOnly.sh 05
+
+

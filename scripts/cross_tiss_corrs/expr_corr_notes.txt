@@ -1,0 +1,56 @@
+#!/bin/bash
+
+
+
+## aFC calcs, anal done in aFC folder
+
+
+## 1. Calculate effective number of tests per gene
+sbatchopts calcMeffGeneGTs 24 \
+	--array 1-100 \
+	scripts/calcMeffGeneGTs_array_wrapper.sh
+	#--wrap="Rscript scripts/calcMeffGeneGTs_array.R --args $SLURM_ARRAY_TASK_ID"
+meff_file=correlations/gene_tests.meff_gts_gao_99.txt
+echo gene n_var meff | tr ' ' '\t' > $meff_file 
+for i in `seq 1 100`
+do
+	cat correlations/meff_gts_split/gene_tests.meff_gts_gao_99.$i.txt >> $meff_file
+done
+
+
+## 2. Correlated TF expr and eQTL effect size
+num=`wc -l input_files/TFs.info.curated.txt | awk '{print $1"-1"}' | bc`
+job_name=runCrossTissCorrs_med0
+sbatch --job-name=$job_name --array 1-$num \
+        --output=log/$job_name.%A.%a.out \
+        --partition=pe2 --time=1:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+        scripts/submitCorrelateTFs_med0_bychr.sh 05
+
+job_name=combineMed0Corrs
+sbatch --job-name=$job_name --array 1-$num \
+        --output=log/$job_name.%A.%a.out \
+        --partition=pe2 --time=8:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+        scripts/combineMed0TFCorrs.sh 05
+./scripts/combineMed0TFCorrs_last.sh 05 | tee log/combineMed0TFCorrs_last.log
+
+
+## 3. Format and analyze cross-tiss correlations
+num=`wc -l input_files/TFs.info.curated.txt | awk '{print $1"-1"}' | bc`
+job_name=formatCorrs_bytf
+sbatch --job-name=$job_name --array 1-$num \
+	--mem 4g \
+        --output=log/$job_name.%A.%a.out \
+        --partition=pe2 --time=1:00:00 \
+        --mail-type=BEGIN,END,FAIL --mail-user=eflynn@nygenome.org \
+        scripts/formatTFCorrsMed0_byTF_wrapper.sh
+./scripts/combineTopTFCorrs.sh | tee log/combineTopTFCorrs.log
+
+./scripts/formatTopTFCorrs.sh
+
+zcat correlations/cross_tiss_tf_expr_corrs.med0.curated_set.MAF05.all.top.adjp2.txt.gz | \
+        awk '{if (NR == 1 || $9 <= 0.05) {OFS="\t"; print $1,$2,$3,$9} }' \
+        > correlations/cross_tiss_tf_expr_corrs.med0.curated_set.fdr05.txt
+
+

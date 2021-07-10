@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1625893974766.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2883499874",
+    "id" : "8EDA54F5",
+    "lastKnownWriteTime" : 1625896247,
+    "last_content_update" : 1625896247377,
+    "path" : "/gpfs/commons/groups/lappalainen_lab/eflynn/projects/MANUSCRIPT/plots/fig5_APBB1IP.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "13,16",
+        "scrollLine" : "3",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

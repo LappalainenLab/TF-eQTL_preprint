@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1625893289736.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3515726202",
+    "id" : "E07C0AA2",
+    "lastKnownWriteTime" : 1625896689,
+    "last_content_update" : 1625896689957,
+    "path" : "/gpfs/commons/groups/lappalainen_lab/eflynn/projects/examples/scripts/plotExamp1.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "146,32",
+        "scrollLine" : "158",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
