@@ -18,9 +18,9 @@ Data tables organized by analysis.
 
 ## overlap/
 <ul>
-  <li><b>chipseq_motif/z</b></li>
-  <li><b>asb</b></li>
-  <li><b>regulon</b></li>
+  <li><b>chipseq_motif/</b></li>
+  <li><b>asb/</b></li>
+  <li><b>regulon/</b></li>
 </ul>
 
 ## IRF1_kd/
