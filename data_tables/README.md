@@ -25,7 +25,7 @@ Data tables organized by analysis.
 
 ## IRF1_kd/
 <ul>
-  <li><b>ase_condition_fi_tsts.allgenes.txt</b><li>
+  <li><b>ase_condition_fi_tsts.allgenes.txt</b></li>
 </ul>
 
 ## GxE_GWAS/
