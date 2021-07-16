@@ -1,6 +1,7 @@
 Scripts organized by analysis. Scripts will not run as-is as they are written for file organization on the NYGC cluster.
 
 ## variant_sets/
+Scripts to generate variants that overlap a TF binding site (ChIPseq and motif overlap) and have evidence to be an eQTL in GTEx (Caviar 95% credible set) and to calculate effect sizes (aFCs) for those variant-gene pairs.
 <ul>
   <li><b>caviar_notes.txt</b></li>
   <li><b>caviar_scripts/</b></li>
