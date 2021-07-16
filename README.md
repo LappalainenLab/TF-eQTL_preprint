@@ -29,7 +29,7 @@ Data tables and scripts for <i>Transcription factor regulators of eQTL effects a
   <ul>
     <li>Permutations and calculations for ChIPseq and motif overlap of discovered TF-eQTLs</li>
     <li>Regulon gene overlap of discovered TF-eQTL genes</li>
-    <li>Permutations and calculations for (<a href="https://adastra.autosome.ru/">ADASTRA</a>) allele-specific TF binding overlap of discovered TF-eQTLs</li>
+    <li>Permutations and calculations for <a href="https://adastra.autosome.ru/">ADASTRA</a> allele-specific TF binding overlap of discovered TF-eQTLs</li>
   </ul>
   <li><b>IRF1 knockdown</b>:</li>
   <ul>
