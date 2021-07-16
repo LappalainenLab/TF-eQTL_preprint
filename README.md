@@ -38,6 +38,6 @@ Data tables and scripts for <i>Transcription factor regulators of eQTL effects a
   <li><b>Gene-by-environment interactions and GWAS</b>:</li>
   <ul>
     <li>TF-eQTL overlap with gene-by-environment interactions (<a href="10.7554/eLife.67077">Findley et al., 2021</a>)</li>
-    <li>TF-eQTL overlap with GWAS-eQTL colocalizations (<a href="10.1186/s13059-020-02252-4">Barbeira et al, 2021</a>)</li>
+    <li>TF-eQTL overlap with GWAS-eQTL colocalizations (<a href="10.1186/s13059-020-02252-4">Barbeira et al., 2021</a>)</li>
   </ul>
 </ul>
